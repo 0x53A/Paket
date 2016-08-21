@@ -4,17 +4,17 @@ NUGET
     Argu (3.2)
     Chessie (0.6)
     FSharp.Core (4.0.0.1) - redirects: force
-    Mono.Cecil (0.9.6.3)
+    Mono.Cecil (0.9.6.4)
     Newtonsoft.Json (9.0.1) - redirects: force
 GITHUB
   remote: fsharp/FAKE
-    src/app/FakeLib/Globbing/Globbing.fs (7f9fe8f546f6adec66febeec31e50821b60814d6)
+    src/app/FakeLib/Globbing/Globbing.fs (934dc8313e2c54793813058fe2540511ad3b8468)
   remote: fsprojects/FSharp.TypeProviders.StarterPack
-    src/AssemblyReader.fs (dfbca9b83fb70067e85abddcb8b89332aae4c28d)
+    src/AssemblyReader.fs (8f647a4cde71bdeda10e7f5b534ec3c879601570)
 GROUP Build
 NUGET
   remote: https://www.nuget.org/api/v2
-    FAKE (4.31.1)
+    FAKE (4.37.2)
     FSharp.Compiler.Service (2.0.0.6)
     FSharp.Formatting (2.14.4)
       FSharp.Compiler.Service (2.0.0.6)
@@ -28,20 +28,20 @@ NUGET
     Microsoft.Net.Http (2.2.29) - framework: net10, net11, net20, net30, net35, net40, net40-full
       Microsoft.Bcl (>= 1.1.10)
       Microsoft.Bcl.Build (>= 1.0.14)
-    Octokit (0.20)
+    Octokit (0.21.1)
       Microsoft.Net.Http  - framework: net10, net11, net20, net30, net35, net40, net40-full
 GITHUB
   remote: fsharp/FAKE
-    modules/Octokit/Octokit.fsx (7f9fe8f546f6adec66febeec31e50821b60814d6)
+    modules/Octokit/Octokit.fsx (934dc8313e2c54793813058fe2540511ad3b8468)
       Octokit (>= 0.20)
 GROUP Test
 NUGET
   remote: https://www.nuget.org/api/v2
     Castle.Core (3.3.3) - framework: >= net45
-    FsCheck (2.5)
+    FsCheck (2.6)
       FSharp.Core (>= 3.1.2.5)
     FSharp.Core (4.0.0.1)
-    Moq (4.5.16)
+    Moq (4.5.21)
       Castle.Core (>= 3.3.3) - framework: >= net45
     NUnit (3.4.1)
     NUnit.Console (3.4.1)
