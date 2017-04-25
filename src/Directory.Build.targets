@@ -1,5 +1,5 @@
 <Project>
-  <PropertyGroup>
+  <!--<PropertyGroup>
     <BuildDependsOn>EmbedPaketFiles;$(BuildDependsOn)</BuildDependsOn>
   </PropertyGroup>
   <Target Name="EmbedPaketFiles">
@@ -10,5 +10,5 @@
     <CreateProperty Value="@(EmbeddedFiles)">  
       <Output TaskParameter="Value" PropertyName="embed" />  
     </CreateProperty>
-  </Target>
+  </Target>-->
 </Project>
