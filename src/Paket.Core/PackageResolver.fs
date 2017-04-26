@@ -392,7 +392,7 @@ let private explorePackageConfig getPackageDetailsF  (pkgConfig:PackageConfig) =
 
 type StackPack = {
     ExploredPackages     : Dictionary<PackageName*SemVerInfo,ResolvedPackage>
-    KnownConflicts       : HashSet<Set<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>
+    KnownConflicts       : HashSet<HashSet<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>
     ConflictHistory      : Dictionary<PackageName, int>
 }
 
@@ -496,23 +496,26 @@ let private getCompatibleVersions
         compatibleVersions, false, tryRelaxed
 
 
-let private getConflicts (currentStep:ResolverStep) (currentRequirement:PackageRequirement) (knownConflicts:HashSet<_>) =
+let private getConflicts (currentStep:ResolverStep) (currentRequirement:PackageRequirement) (knownConflicts:HashSet<HashSet<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>) =
+    
     let allRequirements =
-        currentStep.OpenRequirements
-        |> Set.filter (fun r -> r.Graph |> List.contains currentRequirement |> not)
-        |> Set.union currentStep.ClosedRequirements
+        Set.toArray currentStep.OpenRequirements
+        |> Array.filter (fun r -> r.Graph |> List.contains currentRequirement |> not)
+        |> Seq.append currentStep.ClosedRequirements
+        |> HashSet
 
     knownConflicts
     |> Seq.map (fun (conflicts,selectedVersion) ->
         match selectedVersion with
-        | None when Set.isSubset conflicts allRequirements -> conflicts
+        | None when conflicts.IsSubsetOf( allRequirements ) -> conflicts
         | Some(selectedVersion,_) ->
             let n = (Seq.head conflicts).Name
             match currentStep.FilteredVersions |> Map.tryFind n with
-            | Some(v,_) when v = selectedVersion && Set.isSubset conflicts allRequirements -> conflicts
-            | _ -> Set.empty
-        | _ -> Set.empty)
-    |> Set.unionMany
+            | Some(v,_) when v = selectedVersion && conflicts.IsSubsetOf allRequirements -> conflicts
+            | _ -> HashSet()
+        | _ -> HashSet())
+    |> Seq.collect id
+    |> HashSet
 
 
 let private getCurrentRequirement packageFilter (openRequirements:Set<PackageRequirement>) (conflictHistory:Dictionary<_,_>) =
@@ -577,7 +580,7 @@ let private boostConflicts
         match conflicts with
         | c::_  ->
             let selectedVersion = Map.tryFind c.Name filteredVersions
-            let key = conflicts |> Set.ofList,selectedVersion
+            let key = conflicts |> HashSet,selectedVersion
             stackpack.KnownConflicts.Add key |> ignore
 
             let reportThatResolverIsTakingLongerThanExpected =
@@ -705,14 +708,14 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
 
                 let currentConflict =
                     let getVersionsF = getVersionsF currentRequirement.Sources ResolverStrategy.Max groupName
-                    if Set.isEmpty conflicts then
+                    if Seq.isEmpty conflicts then
                         { currentConflict with
                             Status = Resolution.Conflict(currentStep,Set.empty,currentRequirement,getVersionsF)}
                     else
                         { currentConflict with
-                            Status = Resolution.Conflict(currentStep,conflicts,Seq.head conflicts,getVersionsF)}
+                            Status = Resolution.Conflict(currentStep,set conflicts,Seq.head conflicts,getVersionsF)}
 
-                if not (Set.isEmpty conflicts) then
+                if not (Seq.isEmpty conflicts) then
                     fuseConflicts currentConflict priorConflictSteps
                 else
                     let compatibleVersions,globalOverride,tryRelaxed =
@@ -723,7 +726,7 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
 
                     let currentConflict = {
                         currentConflict with
-                            Conflicts           = conflicts
+                            Conflicts           = set conflicts
                             TryRelaxed          = tryRelaxed
                             GlobalOverride      = globalOverride
                     }
@@ -837,7 +840,7 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
 
     let stackpack = {
         ExploredPackages     = Dictionary<PackageName*SemVerInfo,ResolvedPackage>()
-        KnownConflicts       = (HashSet() : HashSet<Set<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>)
+        KnownConflicts       = (HashSet() : HashSet<HashSet<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>)
         ConflictHistory      = (Dictionary() : Dictionary<PackageName, int>)
     }
 
