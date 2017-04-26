@@ -39,6 +39,7 @@
     <StartWorkingDirectory>C:\dev\src\Paket\integrationtests\scenarios\loading-scripts\dependencies-file-flag\temp</StartWorkingDirectory>
     <StartArguments>install</StartArguments>
     <StartWorkingDirectory>C:\Users\lr\Source\Repos\castos</StartWorkingDirectory>
+    <StartWorkingDirectory>C:\Users\lr\Source\Repos\paket-perf-repro</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <Optimize>true</Optimize>
@@ -68,7 +69,7 @@
     <StartArguments>install</StartArguments>
     <StartWorkingDirectory>D:\temp\PaketWithProblem1</StartWorkingDirectory>
     <StartArguments>install</StartArguments>
-    <StartWorkingDirectory>D:\temp\paketRestoreBug</StartWorkingDirectory>
+    <StartWorkingDirectory>C:\Users\lr\Source\Repos\paket-perf-repro</StartWorkingDirectory>
   </PropertyGroup>
   <PropertyGroup>
     <MinimumVisualStudioVersion Condition="'$(MinimumVisualStudioVersion)' == ''">11</MinimumVisualStudioVersion>
