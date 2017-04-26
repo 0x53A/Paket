@@ -690,7 +690,8 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
                 | currentConflict, [] -> currentConflict
 
             else
-                verbosefn "   %d packages in resolution.%s\n   %d requirements left%s\n" 
+                if Logging.verbose then
+                  verbosefn "   %d packages in resolution.%s\n   %d requirements left%s\n" 
                     currentStep.CurrentResolution.Count 
                     (currentStep.CurrentResolution |> Seq.map (fun x -> sprintf "\n     - %O, %O" x.Key x.Value.Version) |> String.Concat)
                     currentStep.OpenRequirements.Count
