@@ -275,7 +275,7 @@ let calcOpenRequirements (exploredPackage:ResolvedPackage,globalFrameworkRestric
             Settings = { dependency.Settings with FrameworkRestrictions = newRestrictions } })
     |> Set.filter (fun d ->
         resolverStep.ClosedRequirements
-        |> Seq.exists (fun x ->
+        |> Set.exists (fun x ->
             x.Name = d.Name &&
                x.Settings.FrameworkRestrictions = d.Settings.FrameworkRestrictions &&
                 (x = d ||
