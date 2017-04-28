@@ -654,6 +654,8 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
 
     let rec step (stage:Stage) (stackpack:StackPack) compatibleVersions (flags:StepFlags) =
 
+      //printfn "--step-- %A-%A-%A-%A" stage stackpack compatibleVersions flags
+
         let inline fuseConflicts currentConflict priorConflictSteps =
             match currentConflict, priorConflictSteps with
             | currentConflict, (lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags)::priorConflictSteps -> 
@@ -662,6 +664,22 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
                 step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags 
             | currentConflict, [] -> currentConflict
 
+      //let fuseConflicts currentConflict priorConflictSteps =
+      //  let lastRelevantStep =
+      //      priorConflictSteps
+      //      |> Seq.tryFind
+      //      match currentConflict, priorConflictSteps with
+      //      | currentConflict, [] -> currentConflict
+      //      | currentConflict, priorConflictSteps ->
+      //          let lastRelevantStep, priorConflictSteps =
+      //              priorConflictSteps
+      //              |> Seq.fi
+      //          let (lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags) = lastRelevantStep
+      //          let continueConflict = 
+      //              { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
+      //          step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags 
+
+      //let x =
         match stage with            
         | Step((currentConflict,currentStep,_currentRequirement), priorConflictSteps)  -> 
             if Set.isEmpty currentStep.OpenRequirements then
@@ -812,6 +830,8 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
                                        This will result in an endless loop.%sCurrent Requirement: %A%sRequirements: %A" 
                                             Environment.NewLine currentRequirement Environment.NewLine nextStep.OpenRequirements                        
                         step (Step((currentConflict,nextStep,currentRequirement), (currentConflict,currentStep,currentRequirement,compatibleVersions,flags)::priorConflictSteps)) stackpack currentConflict.VersionsToExplore flags
+
+      //x
 
 
     let startingStep = {
