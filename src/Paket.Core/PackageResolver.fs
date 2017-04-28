@@ -499,8 +499,8 @@ let private getCompatibleVersions
 let private getConflicts (currentStep:ResolverStep) (currentRequirement:PackageRequirement) (knownConflicts:HashSet<HashSet<PackageRequirement> * ((SemVerInfo * PackageSource list) list * bool) option>) =
     
     let allRequirements =
-        Set.toArray currentStep.OpenRequirements
-        |> Array.filter (fun r -> r.Graph |> List.contains currentRequirement |> not)
+        Set.toSeq currentStep.OpenRequirements
+        |> Seq.filter (fun r -> r.Graph |> List.contains currentRequirement |> not)
         |> Seq.append currentStep.ClosedRequirements
         |> HashSet
 
