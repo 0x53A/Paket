@@ -4,6 +4,7 @@ module Paket.NuGetV2
 open System
 open System.IO
 open System.Net
+open System.Threading.Tasks
 open Newtonsoft.Json
 open System.IO.Compression
 open System.Xml
@@ -450,7 +451,6 @@ let rec private cleanup (dir : DirectoryInfo) =
 
 /// Extracts the given package to the user folder
 let ExtractPackageToUserFolder(fileName:string, packageName:PackageName, version:SemVerInfo, detailed) =
-    async {
         let targetFolder = DirectoryInfo(Path.Combine(Constants.UserNuGetPackagesFolder,packageName.ToString(),version.Normalize()))
 
         if isExtracted targetFolder fileName |> not then
@@ -471,31 +471,30 @@ let ExtractPackageToUserFolder(fileName:string, packageName:PackageName, version
 
             File.Copy(cachedHashFile,targetPackageFileName + ".sha512")
             cleanup targetFolder
-        return targetFolder.FullName
-    }
+        targetFolder.FullName
 
 /// Extracts the given package to the ./packages folder
 let ExtractPackage(fileName:string, targetFolder, packageName:PackageName, version:SemVerInfo, detailed) =
     async {
-        let directory = DirectoryInfo(targetFolder)
-        if isExtracted directory fileName then
-             verbosefn "%O %O already extracted" packageName version
-        else
-            Directory.CreateDirectory(targetFolder) |> ignore
+        let extract1 = Task.Run(fun () -> 
+            let directory = DirectoryInfo(targetFolder)
+            if isExtracted directory fileName then
+                 verbosefn "%O %O already extracted" packageName version
+            else
+                Directory.CreateDirectory(targetFolder) |> ignore
 
-            try
-                fixArchive fileName
-                ZipFile.ExtractToDirectory(fileName, targetFolder)
-            with
-            | exn ->
-
-                let text = if detailed then sprintf "%s In rare cases a firewall might have blocked the download. Please look into the file and see if it contains text with further information." Environment.NewLine else ""
-                failwithf "Error during extraction of %s.%sMessage: %s%s" (Path.GetFullPath fileName) Environment.NewLine exn.Message text
-
-
-            cleanup directory
-            verbosefn "%O %O unzipped to %s" packageName version targetFolder
-        let! _ = ExtractPackageToUserFolder(fileName, packageName, version, detailed)
+                try
+                    fixArchive fileName
+                    ZipFile.ExtractToDirectory(fileName, targetFolder)
+                with
+                | exn ->
+                    let text = if detailed then sprintf "%s In rare cases a firewall might have blocked the download. Please look into the file and see if it contains text with further information." Environment.NewLine else ""
+                    failwithf "Error during extraction of %s.%sMessage: %s%s" (Path.GetFullPath fileName) Environment.NewLine exn.Message text
+                cleanup directory
+                verbosefn "%O %O unzipped to %s" packageName version targetFolder
+        )
+        let extract2 = Task.Run(fun () -> ExtractPackageToUserFolder(fileName, packageName, version, detailed) |> ignore)
+        let! _ = Task.WaitAll(extract1, extract2) |> Async.AwaitTask
         return targetFolder
     }
 
