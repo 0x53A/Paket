@@ -505,7 +505,7 @@ let private getConflicts (currentStep:ResolverStep) (currentRequirement:PackageR
     knownConflicts
     |> Seq.map (fun (conflicts,selectedVersion) ->
         match selectedVersion with
-        | None when conflicts.IsSubsetOf( allRequirements ) -> conflicts
+        | None when conflicts.IsSubsetOf allRequirements -> conflicts
         | Some(selectedVersion,_) ->
             let n = (Seq.head conflicts).Name
             match currentStep.FilteredVersions |> Map.tryFind n with
@@ -652,36 +652,32 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
     let rec step (stage:Stage) (stackpack:StackPack) compatibleVersions (flags:StepFlags) =
 
         let inline fuseConflicts currentConflict priorConflictSteps conflicts =
-            let findMatchingStep (currentConflict:ConflictState) priorConflictSteps =
-                let row =
-                    priorConflictSteps
-                    |> Seq.tryFind (fun (lastConflict:ConflictState,lastStep:ResolverStep,lastRequirement:PackageRequirement,lastCompatibleVersions:seq<SemVerInfo*_>,lastFlags:StepFlags) ->
-                        let currentNames =
-                            conflicts
-                            |> Seq.collect (fun c ->
-                                let graphNameList =
-                                    c.Graph
-                                    |> List.map (fun (pr:PackageRequirement) -> pr.Name) 
-                                c.Name :: graphNameList)
-                            |> Seq.toArray
-                        currentNames |> Array.contains lastRequirement.Name                        
-                    )
-                row
+            let findMatchingStep priorConflictSteps =
+                priorConflictSteps // row
+                |> Seq.tryFind (fun (_,_,lastRequirement:PackageRequirement,_,_) ->
+                    let currentNames =
+                        conflicts |> Seq.collect (fun c ->
+                            let graphNameList =
+                                c.Graph |> List.map (fun (pr:PackageRequirement) -> pr.Name) 
+                            c.Name :: graphNameList)
+                        |> Seq.toArray
+                    currentNames |> Array.contains lastRequirement.Name                        
+                )
                 |> Option.map (fun r -> r, priorConflictSteps |> List.filter(fun r2 -> not (obj.ReferenceEquals(r, r2))))
-            match priorConflictSteps with
-            | [] -> currentConflict
-            | priorConflictSteps ->
-                match findMatchingStep currentConflict priorConflictSteps with
-                | Some((lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags), priorConflictSteps) ->
-                    let continueConflict = 
-                        { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
-                    step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags
-                | None ->
-                    // could not find a specific package - go back one
-                    let (lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags) :: priorConflictSteps = priorConflictSteps
-                    let continueConflict = 
-                        { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
-                    step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags
+
+            match priorConflictSteps, findMatchingStep priorConflictSteps with
+            | [], _  -> currentConflict
+            | _, Some (head, priorConflictSteps) ->
+                let (lastConflict, lastStep, lastRequirement, lastCompatibleVersions, lastFlags) = head
+                let continueConflict = 
+                    { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
+                step (Inner((continueConflict,lastStep,lastRequirement), priorConflictSteps))  stackpack lastCompatibleVersions lastFlags
+            // could not find a specific package - go back one step
+            | head :: priorConflictSteps, None ->
+                let (lastConflict, lastStep, lastRequirement, lastCompatibleVersions, lastFlags) = head
+                let continueConflict = 
+                    { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
+                step (Inner((continueConflict,lastStep,lastRequirement), priorConflictSteps))  stackpack lastCompatibleVersions lastFlags
                         
         match stage with            
         | Step((currentConflict,currentStep,_currentRequirement), priorConflictSteps)  -> 
@@ -729,10 +725,10 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
                     let getVersionsF = getVersionsF currentRequirement.Sources ResolverStrategy.Max groupName
                     if Seq.isEmpty conflicts then
                         { currentConflict with
-                            Status = Resolution.Conflict(currentStep,Set.empty,currentRequirement,getVersionsF)}
+                            Status = Resolution.Conflict (currentStep,Set.empty,currentRequirement,getVersionsF)}
                     else
                         { currentConflict with
-                            Status = Resolution.Conflict(currentStep,set conflicts,Seq.head conflicts,getVersionsF)}
+                            Status = Resolution.Conflict (currentStep,set conflicts,Seq.head conflicts,getVersionsF)}
 
                 if not (Seq.isEmpty conflicts) then                
                     fuseConflicts currentConflict priorConflictSteps conflicts
