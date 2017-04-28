@@ -203,7 +203,7 @@ module RuntimeGraph =
             NuGetV2.DownloadPackage (None, root, package.Source, [], groupName, package.Name, package.Version, false, false, false)
             |> Async.RunSynchronously
 
-        let extractedDir = NuGetV2.ExtractPackageToUserFolder (targetFileName, package.Name, package.Version, null) |> Async.RunSynchronously
+        let extractedDir = NuGetV2.ExtractPackageToUserFolder (targetFileName, package.Name, package.Version, null)
         // 2. Get runtime graph
         let runtime = Path.Combine(extractedDir, "runtime.json")
         if File.Exists runtime then Some (runtime) else None

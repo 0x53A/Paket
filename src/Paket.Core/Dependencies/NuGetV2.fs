@@ -494,7 +494,7 @@ let ExtractPackage(fileName:string, targetFolder, packageName:PackageName, versi
                 verbosefn "%O %O unzipped to %s" packageName version targetFolder
         )
         let extract2 = Task.Run(fun () -> ExtractPackageToUserFolder(fileName, packageName, version, detailed) |> ignore)
-        let! _ = Task.WaitAll(extract1, extract2) |> Async.AwaitTask
+        let! _ = Task.WhenAll(extract1, extract2) |> Async.AwaitTask
         return targetFolder
     }
 
