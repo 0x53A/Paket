@@ -661,22 +661,31 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
                             |> Seq.tryFind (fun (lastConflict:ConflictState,lastStep:ResolverStep,lastRequirement:PackageRequirement,lastCompatibleVersions:seq<SemVerInfo*_>,lastFlags:StepFlags) ->
                                 let currentNames =
                                     conflicts
-                                        |> Seq.collect (fun c -> c.Graph)
-                                        |> Seq.map (fun c -> c.Name)
-                                currentNames |> Seq.contains lastRequirement.Name                        
+                                    |> Seq.collect (fun c ->
+                                        let graphNameList =
+                                            c.Graph
+                                            |> List.map (fun (pr:PackageRequirement) -> pr.Name) 
+                                        c.Name :: graphNameList)
+                                    |> Seq.toArray
+                                currentNames |> Array.contains lastRequirement.Name                        
                             )
                         row
                         |> Option.map (fun r -> r, priorConflictSteps |> List.filter(fun r2 -> not (obj.ReferenceEquals(r, r2))))
                     match priorConflictSteps with
                     | [] -> currentConflict
-                    | _ ->
+                    | priorConflictSteps ->
                         match findMatchingStep currentConflict priorConflictSteps with
-                        | Some((lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags), rest) ->
+                        | Some((lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags), priorConflictSteps) ->
                             let continueConflict = 
                                 { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
                             step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags
-                        | None -> currentConflict
-
+                        | None ->
+                            // could not find a specific package - go back one
+                            let (lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags) :: priorConflictSteps = priorConflictSteps
+                            let continueConflict = 
+                                { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
+                            step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags
+                        
       //let fuseConflicts currentConflict priorConflictSteps =
       //  let lastRelevantStep =
       //      priorConflictSteps
