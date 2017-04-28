@@ -656,7 +656,7 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
 
       //printfn "--step-- %A-%A-%A-%A" stage stackpack compatibleVersions flags
 
-        let inline fuseConflicts currentConflict priorConflictSteps =
+      let fuseConflicts currentConflict priorConflictSteps =
             match currentConflict, priorConflictSteps with
             | currentConflict, (lastConflict,lastStep,lastRequirement,lastCompatibleVersions,lastFlags)::priorConflictSteps -> 
                 let continueConflict = 
@@ -679,7 +679,7 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
       //              { currentConflict with VersionsToExplore = lastConflict.VersionsToExplore }        
       //          step (Inner((continueConflict,lastStep,lastRequirement),priorConflictSteps))  stackpack lastCompatibleVersions lastFlags 
 
-      //let x =
+      let x =
         match stage with            
         | Step((currentConflict,currentStep,_currentRequirement), priorConflictSteps)  -> 
             if Set.isEmpty currentStep.OpenRequirements then
@@ -831,7 +831,7 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
                                             Environment.NewLine currentRequirement Environment.NewLine nextStep.OpenRequirements                        
                         step (Step((currentConflict,nextStep,currentRequirement), (currentConflict,currentStep,currentRequirement,compatibleVersions,flags)::priorConflictSteps)) stackpack currentConflict.VersionsToExplore flags
 
-      //x
+      x
 
 
     let startingStep = {
