@@ -654,7 +654,7 @@ let Resolve (getVersionsF, getPackageDetailsF, groupName:GroupName, globalStrate
 
       //printfn "--step-- %A-%A-%A-%A" stage stackpack compatibleVersions flags
 
-        let fuseConflicts currentConflict priorConflictSteps conflicts =
+        let inline fuseConflicts currentConflict priorConflictSteps conflicts =
                     let findMatchingStep (currentConflict:ConflictState) priorConflictSteps =
                         let row =
                             priorConflictSteps
