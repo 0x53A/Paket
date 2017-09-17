@@ -1,6 +1,5 @@
-image: microsoft/windowsservercore:latest
+image: mono:latest
 
 job1:
-  stage: build
   script:
     - build.cmd
