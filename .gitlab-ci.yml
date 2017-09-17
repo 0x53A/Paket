@@ -1,4 +1,6 @@
 image: microsoft/windowsservercore:latest
 
 job1:
- - build.cmd
+  stage: build
+  script:
+    - build.cmd
