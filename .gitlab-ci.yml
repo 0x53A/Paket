@@ -2,4 +2,4 @@ image: mono:latest
 
 job1:
   script:
-    - build.sh
+    - ./build.sh
