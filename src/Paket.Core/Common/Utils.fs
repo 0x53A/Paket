@@ -780,6 +780,8 @@ let rec private _safeGetFromUrl (auth:Auth option, url : string, contentType : s
     let shouldRetry exn =
         printfn "-- Error: %A" (getExceptionNames exn)
         printfn "-- Error: %O" exn
+        eprintfn "-- Error: %A" (getExceptionNames exn)
+        eprintfn "-- Error: %O" exn
         isMonoRuntime && iTry < nTries && (getExceptionNames exn |> List.contains "MonoBtlsException")
     
     async {
