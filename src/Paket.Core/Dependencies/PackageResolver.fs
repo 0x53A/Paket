@@ -985,11 +985,11 @@ let Resolve (getVersionsRaw : PackageVersionsFunc, getPreferredVersionsRaw : Pre
     let getVersionsBlock resolverStrategy versionParams =
         let workHandle = startRequestGetVersions versionParams
         let versions =
-            try 
+            //try 
                 getAndReport versionParams.Package.Sources Profile.BlockReason.GetVersion workHandle 
                 |> Seq.toList
-            with e ->
-                raise (Exception (sprintf "Unable to retrieve package versions for '%O'" versionParams.Package.PackageName, e))
+            //with e ->
+                //raise (Exception (sprintf "Unable to retrieve package versions for '%O'" versionParams.Package.PackageName, e))
         let sorted =
             match resolverStrategy with
             | ResolverStrategy.Max -> List.sortDescending versions
