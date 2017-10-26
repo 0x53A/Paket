@@ -770,6 +770,11 @@ let handleCommand silent command =
     | Log_File _ -> failwithf "internal error: this code should never be reached."
 
 let main() =
+
+    AppDomain.CurrentDomain.FirstChanceException.Add(fun exn ->
+        if exn.Exception.GetType().Name.Contains("MonoBtlsException") then
+            eprintfn "--FirstChance: %O" exn.Exception
+    )
     let resolution = Environment.GetEnvironmentVariable ("PAKET_DISABLE_RUNTIME_RESOLUTION")
     Logging.verboseWarnings <- Environment.GetEnvironmentVariable "PAKET_DETAILED_WARNINGS" = "true"
     if System.String.IsNullOrEmpty resolution then
