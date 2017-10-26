@@ -773,8 +773,7 @@ let main() =
 
     AppDomain.CurrentDomain.FirstChanceException.Add(fun exn ->
         if exn.Exception.GetType().Name.Contains("HttpRequestException") then
-            eprintfn "--FirstChance: %O" exn.Exception
-            printfn "--FirstChance: %O" exn.Exception
+            System.IO.File.AppendAllText("exceptions.txt", sprintf "\n-- Exception at:---------------\n%s\n----------\n%O\n------------\n\n" Environment.StackTrace exn.Exception )
     )
     let resolution = Environment.GetEnvironmentVariable ("PAKET_DISABLE_RUNTIME_RESOLUTION")
     Logging.verboseWarnings <- Environment.GetEnvironmentVariable "PAKET_DETAILED_WARNINGS" = "true"
