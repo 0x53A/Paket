@@ -72,7 +72,7 @@ let [<Literal>] Penalty_Netcore = 100
 let [<Literal>] Penalty_Portable = 1000
 let [<Literal>] Penalty_UnsupportedProfile = 10000
 let [<Literal>] Penalty_Fallback = 100000
-let rec getPlatformPenalty =
+let rec getPlatformPenalty (mode:HandlingMode) =
     memoize (fun (targetPlatform:TargetProfile,packagePlatform:TargetProfile) ->
         if packagePlatform = targetPlatform then
             0
@@ -85,13 +85,13 @@ let rec getPlatformPenalty =
                 // We cannot find unsupported profiles in our "SupportedPlatforms" list
                 // Just check if we are compatible at all and return a high penalty
                 
-                if packagePlatform.IsSupportedBy targetPlatform then
+                if packagePlatform.IsSupportedBy mode targetPlatform then
                     Penalty_UnsupportedProfile
                 else MaxPenalty
             | _ ->
                 let penalty =
-                    targetPlatform.SupportedPlatforms
-                    |> Seq.map (fun target -> getPlatformPenalty (target, packagePlatform))
+                    targetPlatform.SupportedPlatforms mode
+                    |> Seq.map (fun target -> getPlatformPenalty mode (target, packagePlatform))
                     |> Seq.append [MaxPenalty]
                     |> Seq.min
                     |> fun p -> p + Penalty_VersionJump
@@ -105,11 +105,11 @@ let rec getPlatformPenalty =
                 | TargetProfile.PortableProfile _, TargetProfile.SinglePlatform _ -> Penalty_Portable + penalty
                 | _ -> penalty)
 
-let getFrameworkPenalty (fr1, fr2) =
-    getPlatformPenalty (TargetProfile.SinglePlatform fr1, TargetProfile.SinglePlatform fr2)
+let getFrameworkPenalty (mode:HandlingMode) (fr1, fr2) =
+    getPlatformPenalty mode (TargetProfile.SinglePlatform fr1, TargetProfile.SinglePlatform fr2)
 
 
-let getPathPenalty =
+let getPathPenalty (mode:HandlingMode) =
     memoize
       (fun (path:ParsedPlatformPath,platform:TargetProfile) ->
         let handleEmpty () =
@@ -121,18 +121,18 @@ let getPathPenalty =
         | [] -> MaxPenalty // Ignore this path as it contains no platforms, but the folder apparently has a name -> we failed to detect the framework and ignore it
         | [ h ] ->
             let additionalPen = if path.Name.EndsWith "-client" then Penalty_Client else 0
-            additionalPen + getPlatformPenalty(platform,TargetProfile.SinglePlatform h)
+            additionalPen + getPlatformPenalty mode (platform,TargetProfile.SinglePlatform h)
         | _ ->
             // No warnig -> should be reported later
-            getPlatformPenalty(platform, TargetProfile.FindPortable false path.Platforms))
+            getPlatformPenalty mode (platform, TargetProfile.FindPortable false path.Platforms))
 
 [<Obsolete("Used in test code, use getPathPenalty instead.")>]
-let getFrameworkPathPenalty fr path =
+let getFrameworkPathPenalty (mode:HandlingMode) fr path =
     match fr with
-    | [ h ] -> getPathPenalty (path, TargetProfile.SinglePlatform h)
+    | [ h ] -> getPathPenalty mode (path, TargetProfile.SinglePlatform h)
     | _ ->
         // No warnig -> should be reported later
-        getPathPenalty (path, TargetProfile.FindPortable false fr)
+        getPathPenalty mode (path, TargetProfile.FindPortable false fr)
 
 type PathPenalty = (ParsedPlatformPath * int)
 
@@ -159,33 +159,33 @@ let comparePaths (p1 : PathPenalty) (p2 : PathPenalty) =
         0
 
 
-let collectPlatforms =
+let collectPlatforms (mode:HandlingMode) =
     let rec loop (acc:TargetProfile list) (framework:TargetProfile) (profls:TargetProfile Set) =
         profls
         |> Seq.fold (fun acc f ->
-            if f.SupportedPlatforms |> Set.contains (framework) then
+            if f.SupportedPlatforms mode |> Set.contains (framework) then
                 Set.add f acc
             else acc) Set.empty
     memoize (fun (framework,profls) -> loop ([]:TargetProfile list) framework profls)
 
 
-let platformsSupport = 
+let platformsSupport (mode:HandlingMode) = 
     let rec platformsSupport platform platforms = 
         if Set.isEmpty platforms then MaxPenalty
         elif platforms |> Set.contains (platform) then 1
         else 
             platforms |> Set.toArray
             |> Array.Parallel.map (fun (p : TargetProfile) -> 
-                collectPlatforms (p,KnownTargetProfiles.AllProfiles)
+                collectPlatforms mode (p,KnownTargetProfiles.AllProfiles)
             ) |> Set.unionMany
             |> platformsSupport platform |> (+) 1
     memoize (fun (platform,platforms) -> platformsSupport platform platforms)
 
 
-let findBestMatch = 
+let findBestMatch (mode:HandlingMode) = 
     let rec findBestMatch (paths : ParsedPlatformPath list, targetProfile : TargetProfile) = 
         paths
-        |> List.map (fun path -> path, (getPathPenalty (path, targetProfile)))
+        |> List.map (fun path -> path, (getPathPenalty mode (path, targetProfile)))
         |> List.filter (fun (_, penalty) -> penalty < MaxPenalty)
         |> List.sortWith comparePaths
         |> List.map fst
@@ -195,12 +195,12 @@ let findBestMatch =
 
 // For a given list of paths and target profiles return tuples of paths with their supported target profiles.
 // Every target profile will only be listed for own path - the one that best supports it. 
-let getSupportedTargetProfiles =    
+let getSupportedTargetProfiles (mode:HandlingMode) =    
     memoize 
         (fun (paths : ParsedPlatformPath list) ->
             KnownTargetProfiles.AllProfiles
             |> Seq.choose (fun target ->
-                match findBestMatch(paths,target) with
+                match findBestMatch mode (paths,target) with
                 | Some p -> Some(p, target)
                 | _ -> None)
             |> Seq.groupBy fst

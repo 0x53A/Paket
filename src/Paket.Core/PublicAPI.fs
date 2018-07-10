@@ -887,11 +887,11 @@ module PublicAPI =
     /// into the internal representation used by Paket.
     let ParseSemVer (version:string) = SemVer.Parse version
 
-    let PreCalculateMaps () =
+    let PreCalculateMaps (mode:HandlingMode) =
         async {
             KnownTargetProfiles.AllProfiles
             |> Seq.iter (fun profile -> 
-                SupportCalculation.getPlatformsSupporting profile |> ignore
+                SupportCalculation.getPlatformsSupporting mode profile |> ignore
                 let fws =
                     profile.Frameworks
                     |> List.filter (function
@@ -909,6 +909,6 @@ module PublicAPI =
                         | _ -> true)
                 if fws.Length > 0 then SupportCalculation.findPortable false fws |> ignore)
             // calculated as part of the above...
-            SupportCalculation.getSupportedPreCalculated (PortableProfileType.Profile259) |> ignore
+            SupportCalculation.getSupportedPreCalculated mode (PortableProfileType.Profile259) |> ignore
         }
         |> Async.StartAsTask

@@ -6,6 +6,12 @@ open System.Diagnostics
 open Logging
 
 
+type HandlingMode = NativeSupport | ToolingSupport
+
+// In some places, we need to attach the handling mode to a type. Use a generic dummy for this.
+type _NativeSupport = class end
+type _ToolingSupport = class end
+
 /// The .NET Standard version.
 // Each time a new version is added NuGetPackageCache.CurrentCacheVersion should be bumped.
 [<RequireQualifiedAccess>]
@@ -529,10 +535,10 @@ type FrameworkIdentifier =
         | Tizen v -> "tizen" + v.ShortString()
 
 
-    member internal x.RawSupportedPlatformsTransitive =
+    member internal x.RawSupportedPlatformsTransitive (mode:HandlingMode) =
         let findNewPlats (known:FrameworkIdentifier list) (lastStep:FrameworkIdentifier list) =
             lastStep
-            |> List.collect (fun k -> k.RawSupportedPlatforms)
+            |> List.collect (fun k -> k.RawSupportedPlatforms mode)
             |> List.filter (fun k -> known |> Seq.contains k |> not)
 
         Seq.initInfinite (fun _ -> 1)
@@ -549,7 +555,7 @@ type FrameworkIdentifier =
         |> fst
 
     // returns a list of compatible platforms that this platform also supports
-    member internal x.RawSupportedPlatforms =
+    member internal x.RawSupportedPlatforms (mode:HandlingMode) =
         match x with
         | MonoAndroid MonoAndroidVersion.V1 -> []
         | MonoAndroid MonoAndroidVersion.V2_2 -> [ MonoAndroid MonoAndroidVersion.V1 ]
@@ -592,7 +598,11 @@ type FrameworkIdentifier =
         | DotNetFramework FrameworkVersion.V4_5_2 -> [ DotNetFramework FrameworkVersion.V4_5_1; DotNetStandard DotNetStandardVersion.V1_2 ]
         | DotNetFramework FrameworkVersion.V4_5_3 -> [ DotNetFramework FrameworkVersion.V4_5_2; DotNetStandard DotNetStandardVersion.V1_2 ]
         | DotNetFramework FrameworkVersion.V4_6 -> [ DotNetFramework FrameworkVersion.V4_5_3; DotNetStandard DotNetStandardVersion.V1_3 ]
-        | DotNetFramework FrameworkVersion.V4_6_1 -> [ DotNetFramework FrameworkVersion.V4_6; DotNetStandard DotNetStandardVersion.V1_4 ]
+        | DotNetFramework FrameworkVersion.V4_6_1 ->
+            match mode with
+            | NativeSupport -> [ DotNetFramework FrameworkVersion.V4_6; DotNetStandard DotNetStandardVersion.V1_4 ]
+            // .NET Standard 2.0 will propagate "down", so we don't need any switches on the subsequent frameworks
+            | ToolingSupport -> [ DotNetFramework FrameworkVersion.V4_6; DotNetStandard DotNetStandardVersion.V2_0 ]
         | DotNetFramework FrameworkVersion.V4_6_2 -> [ DotNetFramework FrameworkVersion.V4_6_1; DotNetStandard DotNetStandardVersion.V1_5 ]
         | DotNetFramework FrameworkVersion.V4_6_3 -> [ DotNetFramework FrameworkVersion.V4_6_2 ]
         | DotNetFramework FrameworkVersion.V4_7 -> [ DotNetFramework FrameworkVersion.V4_6_3]
@@ -1330,13 +1340,13 @@ module KnownTargetProfiles =
         | None -> failwithf "tried to find portable profile '%s' but it is unknown to paket" name
 
 module SupportCalculation =
-    let isSupportedNotEqual (portable:PortableProfileType) (other:PortableProfileType) =
+    let isSupportedNotEqual (mode:HandlingMode) (portable:PortableProfileType) (other:PortableProfileType) =
         let name, tfs = portable.ProfileName, portable.Frameworks
 
         let otherName, otherfws = other.ProfileName, other.Frameworks
         let weSupport =
             tfs
-            |> List.collect (fun tf -> tf.RawSupportedPlatformsTransitive)
+            |> List.collect (fun tf -> tf.RawSupportedPlatformsTransitive mode)
 
         let relevantFrameworks =
             otherfws
@@ -1345,11 +1355,11 @@ module SupportCalculation =
             |> Seq.length
         relevantFrameworks >= tfs.Length && portable <> other
 
-    let getSupported (portable:PortableProfileType) =
+    let getSupported (mode:HandlingMode) (portable:PortableProfileType) =
         let name, tfs = portable.ProfileName, portable.Frameworks
         KnownTargetProfiles.AllPortableProfiles
         |> List.filter (fun p -> p.ProfileName <> name)
-        |> List.filter (fun other -> isSupportedNotEqual portable other)
+        |> List.filter (fun other -> isSupportedNotEqual mode portable other)
         |> List.map TargetProfile.PortableProfile
     type SupportMap = System.Collections.Concurrent.ConcurrentDictionary<PortableProfileType,PortableProfileType list>
     let ofSeq s = s|> dict |> System.Collections.Concurrent.ConcurrentDictionary
@@ -1392,36 +1402,36 @@ module SupportCalculation =
                     hasChanged <- true
         sup
 
-    let private getSupportedPortables p =
-        getSupported p
+    let private getSupportedPortables (mode:HandlingMode) p =
+        getSupported mode p
         |> List.choose (function TargetProfile.PortableProfile p -> Some p | _ -> failwithf "Expected portable")
 
-    let createInitialSupportMap () =
+    let createInitialSupportMap (mode:HandlingMode) =
         KnownTargetProfiles.AllPortableProfiles
-        |> List.map (fun p -> p, getSupportedPortables p)
+        |> List.map (fun p -> p, getSupportedPortables mode p)
         |> ofSeq
 
     let mutable private supportMap: SupportMap option = None
 
-    let private getSupportMap () =
+    let private getSupportMap (mode:HandlingMode) =
         match supportMap with
         | Some supportMap ->
             supportMap
         | None ->
-            supportMap <- Some (optimizeSupportMap (createInitialSupportMap()))
+            supportMap <- Some (optimizeSupportMap (createInitialSupportMap mode))
             supportMap.Value
 
-    let getSupportedPreCalculated (p:PortableProfileType) =
-        match getSupportMap().TryGetValue p with
+    let getSupportedPreCalculated (mode:HandlingMode) (p:PortableProfileType) =
+        match getSupportMap(mode).TryGetValue p with
         | true, v -> v
         | _ ->
             match p with
             | UnsupportedProfile tfs ->
-                match getSupportMap().TryGetValue p with
+                match getSupportMap(mode).TryGetValue p with
                 | true, v -> v
                 | _ ->
-                    let clone = getSupportMap() |> toSeq |> ofSeq
-                    clone.[p] <- getSupportedPortables p
+                    let clone = getSupportMap(mode) |> toSeq |> ofSeq
+                    clone.[p] <- getSupportedPortables mode p
                     let opt = optimizeSupportMap clone
                     let result = opt.[p]
                     supportMap <- Some opt
@@ -1468,11 +1478,11 @@ module SupportCalculation =
             traceWarnfn "The profile '%O' is not a known profile. Please tell the package author." result
         result
 
-    let getSupportedPlatforms x =
+    let getSupportedPlatforms (mode:HandlingMode) x =
         match x with
         | TargetProfile.SinglePlatform tf ->
             let rawSupported =
-                tf.RawSupportedPlatforms
+                tf.RawSupportedPlatforms mode
                 |> List.map TargetProfile.SinglePlatform
             let profilesSupported =
                 // See https://docs.microsoft.com/en-us/dotnet/articles/standard/library
@@ -1537,14 +1547,14 @@ module SupportCalculation =
                 |> List.map TargetProfile.PortableProfile
             rawSupported @ profilesSupported
         | TargetProfile.PortableProfile p ->
-            getSupportedPreCalculated p
+            getSupportedPreCalculated mode p
             |> List.map TargetProfile.PortableProfile
         |> Set.ofList
 
-    let getSupportedPlatformsTransitive =
+    let getSupportedPlatformsTransitive (mode:HandlingMode) =
         let findNewPlats (known:TargetProfile Set) (lastStep:TargetProfile Set) =
             lastStep
-            |> Seq.map (fun k -> Set.difference (getSupportedPlatforms k) known)
+            |> Seq.map (fun k -> Set.difference (getSupportedPlatforms mode k) known)
             |> Set.unionMany
 
         memoize (fun x ->
@@ -1563,26 +1573,26 @@ module SupportCalculation =
         )
 
     /// true when x is supported by y, for example netstandard15 is supported by netcore10
-    let isSupportedBy x y =
+    let isSupportedBy (mode:HandlingMode) x y =
         match x with
         | TargetProfile.PortableProfile (PortableProfileType.UnsupportedProfile xs' as x') ->
             // custom profiles are not in our lists -> custom logic
             match y with
             | TargetProfile.PortableProfile y' ->
                 x' = y' ||
-                isSupportedNotEqual y' x'
+                isSupportedNotEqual mode y' x'
             | TargetProfile.SinglePlatform y' ->
-                y'.RawSupportedPlatformsTransitive |> Seq.exists (fun y'' ->
+                y'.RawSupportedPlatformsTransitive mode |> Seq.exists (fun y'' ->
                     xs' |> Seq.contains y'')
         | _ ->
             x = y ||
-              (getSupportedPlatformsTransitive y |> Set.contains x)
+              (getSupportedPlatformsTransitive mode y |> Set.contains x)
 
-    let getPlatformsSupporting =
+    let getPlatformsSupporting (mode:HandlingMode) =
         // http://nugettoolsdev.azurewebsites.net
         let calculate (x:TargetProfile) =
             KnownTargetProfiles.AllProfiles
-            |> Set.filter (fun plat -> isSupportedBy x plat)
+            |> Set.filter (fun plat -> isSupportedBy mode x plat)
         memoize calculate
 
 type TargetProfile with
@@ -1592,30 +1602,30 @@ type TargetProfile with
         | TargetProfile.PortableProfile p -> p.Frameworks
     static member FindPortable warnWhenUnsupported (fws: _ list) = SupportCalculation.findPortable warnWhenUnsupported fws
 
-    member inline x.PlatformsSupporting = SupportCalculation.getPlatformsSupporting x
+    member inline x.PlatformsSupporting (mode:HandlingMode) = SupportCalculation.getPlatformsSupporting mode x
 
     /// true when x is supported by y, for example netstandard15 is supported by netcore10
-    member inline x.IsSupportedBy y =
-        SupportCalculation.isSupportedBy x y
+    member inline x.IsSupportedBy (mode:HandlingMode) y =
+        SupportCalculation.isSupportedBy mode x y
     /// true when x is at least (>=) y ie when y is supported by x, for example netcore10 >= netstandard15 as netstandard15 is supported by netcore10.
     /// Note that this relation is not complete, for example for WindowsPhoneSilverlightv7.0 and Windowsv4.5 both <= and >= are false from this definition as
     /// no platform supports the other.
-    member inline x.IsAtLeast (y:TargetProfile) =
-        y.IsSupportedBy x
+    member inline x.IsAtLeast (mode:HandlingMode) (y:TargetProfile) =
+        y.IsSupportedBy mode x
 
     /// Get all platforms y for which x >= y holds
-    member inline x.SupportedPlatformsTransitive =
-        SupportCalculation.getSupportedPlatformsTransitive x
+    member inline x.SupportedPlatformsTransitive (mode:HandlingMode) =
+        SupportCalculation.getSupportedPlatformsTransitive mode x
 
-    member inline x.SupportedPlatforms : TargetProfile Set =
-        SupportCalculation.getSupportedPlatforms x
+    member inline x.SupportedPlatforms (mode:HandlingMode) : TargetProfile Set =
+        SupportCalculation.getSupportedPlatforms mode x
 
     /// x < y, see y >= x && x <> y
-    member inline x.IsSmallerThan y =
-        x.IsSupportedBy y && x <> y
+    member inline x.IsSmallerThan (mode:HandlingMode) y =
+        x.IsSupportedBy mode y && x <> y
 
     member inline x.IsSmallerThanOrEqual y =
         x.IsSupportedBy y
 
     /// Note that this returns true only when a >= x and x < b holds.
-    member x.IsBetween(a,b) = x.IsAtLeast a && x.IsSmallerThan b
+    member x.IsBetween (mode:HandlingMode) (a,b) = x.IsAtLeast mode a && x.IsSmallerThan mode b
